@@ -1,0 +1,1 @@
+Analysis of r/WallStreetBets discussions and financial data to identify potential short squeeze candidates. It combines social sentiment with key metrics like short interest and days-to-cover to find stocks with squeeze potential before they take off. 🚀
