@@ -2,6 +2,7 @@ import logging
 import argparse
 import time
 import os
+from data.collection.reddit_scraper import RedditScraper
 
 
 # Set up logging
@@ -30,6 +31,7 @@ def run_pipeline(output_dir='./output', dashboard=False):
     # Collect reddit data
     logger.info("Step 1: Collecting Reddit data from WSB")
     reddit_scraper = RedditScraper()        # Implement RedditScraper
+    
     
 
 
