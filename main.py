@@ -1,4 +1,5 @@
 import logging
+import argparse
 
 # Set up logging
 logging.basicConfig(
@@ -10,3 +11,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description = "Short Squeeze Detector aka. APExplorer")
+    
+    args = parser.parse_args()
+    # run the pipeline
