@@ -32,6 +32,14 @@ def run_pipeline(output_dir='./output', dashboard=False):
     logger.info("Step 1: Collecting Reddit data from WSB")
     reddit_scraper = RedditScraper()        # Implement RedditScraper
     
+    posts_df, comments_df = reddit_scraper.collect_wsb_data()
+    
+    if posts_df.empty:
+        logger.error("Failed to collect Reddit posts. Exiting.")
+        return
+    
+    posts_df.to_csv(os.path.join(output_dir, 'raw_posts.csv'), index=False)
+    comments_df.to_csv(os.path.join(output_dir, 'raw_comments.csv'), index=False)
     
 
 
