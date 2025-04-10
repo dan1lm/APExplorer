@@ -30,7 +30,7 @@ def run_pipeline(output_dir='./output', dashboard=False):
     
     # Collect reddit data
     logger.info("Step 1: Collecting Reddit data from WSB")
-    reddit_scraper = RedditScraper()        # Implement RedditScraper
+    reddit_scraper = RedditScraper()        
     
     posts_df, comments_df = reddit_scraper.collect_wsb_data()
     

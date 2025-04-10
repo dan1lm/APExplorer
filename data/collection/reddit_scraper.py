@@ -6,7 +6,7 @@ from config.config import (
     POST_LIMIT, COMMENT_LIMIT, HISTORICAL_DAYS
 )
 
-import tqdm
+from tqdm import tqdm
 from datetime import datetime, timedelta
 import pandas as pd
 import time
@@ -80,3 +80,89 @@ class RedditScraper:
         except Exception as e:
             logger.error(f"Error fetching posts from r/{subreddit_name}: {e}")
             return pd.DataFrame()
+
+    def get_comments(self, post_id, limit=COMMENT_LIMIT):
+        """
+        Fetch comments for a specific post
+        
+        Args:
+            post_id (str): Reddit post ID
+            limit (int): Maximum number of comments to fetch
+            
+        Returns:
+            pandas.DataFrame: DataFrame containing comment data
+        """
+        try:
+            submission = self.reddit.submission(id=post_id)
+            submission.comments.replace_more(limit=0)  # Top-level comments
+            
+            comments_data = []
+            comment_count = 0
+            
+            for comment in submission.comments.list():
+                if comment_count >= limit:
+                    break
+                    
+                comment_data = {
+                    'comment_id': comment.id,
+                    'post_id': post_id,
+                    'text': comment.body,
+                    'score': comment.score,
+                    'created_utc': comment.created_utc,
+                    'author': str(comment.author),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+                comments_data.append(comment_data)
+                comment_count += 1
+                
+                time.sleep(0.05)
+                
+            return pd.DataFrame(comments_data)
+        
+        except Exception as e:
+            logger.error(f"Error fetching comments for post {post_id}: {e}")
+            return pd.DataFrame()
+
+
+    def collect_wsb_data(self):
+        """
+        Collect posts and comments from all configured subreddits
+        
+        Returns:
+            tuple: (posts_df, comments_df) DataFrames containing all collected data
+        """
+        all_posts = []
+        all_comments = []
+        
+        for subreddit in SUBREDDITS:
+            for time_filter in ['day', 'week', 'month']:
+                posts_df = self.get_posts(subreddit, time_filter=time_filter)
+                
+                if not posts_df.empty:
+                    all_posts.append(posts_df)
+                    
+                    for post_id in posts_df['post_id']:
+                        comments_df = self.get_comments(post_id)
+                        if not comments_df.empty:
+                            all_comments.append(comments_df)
+                            
+                    time.sleep(1)
+        
+        # Combine all posts and comments
+        posts_df = pd.concat(all_posts, ignore_index=True) if all_posts else pd.DataFrame()
+        comments_df = pd.concat(all_comments, ignore_index=True) if all_comments else pd.DataFrame()
+        
+        logger.info(f"Total posts collected: {len(posts_df)}")
+        logger.info(f"Total comments collected: {len(comments_df)}")
+        
+        return posts_df, comments_df
+
+
+
+if __name__ == "__main__":
+    scraper = RedditScraper()
+    posts_df, comments_df = scraper.collect_wsb_data()
+    
+    posts_df.to_csv('wsb_posts.csv', index=False)
+    comments_df.to_csv('wsb_comments.csv', index=False)
