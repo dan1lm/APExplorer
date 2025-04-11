@@ -3,6 +3,7 @@ import argparse
 import time
 import os
 from data.collection.reddit_scraper import RedditScraper
+from analysis.text_processing import TextProcessor
 
 
 # Set up logging
