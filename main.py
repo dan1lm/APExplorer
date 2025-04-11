@@ -41,6 +41,10 @@ def run_pipeline(output_dir='./output', dashboard=False):
     posts_df.to_csv(os.path.join(output_dir, 'raw_posts.csv'), index=False)
     comments_df.to_csv(os.path.join(output_dir, 'raw_comments.csv'), index=False)
     
+    logger.info("Step 2: Processing text to extract tickers and sentiment")
+    text_processor = TextProcessor()
+    ticker_mentions, ticker_sentiment, ticker_contexts = text_processor.process_posts_and_comments(posts_df, comments_df)
+    
 
 
 
