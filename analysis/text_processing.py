@@ -147,6 +147,31 @@ class TextProcessor:
         }
         logger.info(f"Using fallback list of {len(fallback_tickers)} common tickers")
         return fallback_tickers
+    
+    def _is_valid_ticker(self, ticker):
+        """
+        Check if a ticker is valid and exists
+        
+        Args:
+            ticker (str): Ticker symbol to check
+            
+        Returns:
+            bool: True if valid, False if invalid
+        """
+
+        if ticker in self.valid_tickers:
+            return True
+            
+        # Validate with Yahoo Finance if not in the valid tickers list
+        try:
+            ticker_info = yf.Ticker(ticker).info
+            if 'symbol' in ticker_info:
+                # Add to our valid tickers set for future reference
+                self.valid_tickers.add(ticker)
+                return True
+            return False
+        except:
+            return False
 
 if __name__ == '__main__':
     textProcessor = TextProcessor()
