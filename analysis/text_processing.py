@@ -122,6 +122,31 @@ class TextProcessor:
         except Exception as e:
             logger.error(f"Error loading ticker list from Twelvedata: {e}")
             return self._get_fallback_tickers()
+    
+    def _get_fallback_tickers(self):
+        """
+        Fallback list of common tickers if something goes wrong with API
+        
+        Returns:
+            set: Set of tickers
+        """
+
+        fallback_tickers = {
+            "AAPL", "MSFT", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "NVDA", 
+            "GME", "AMC", "BB", "NOK", "PLTR", "TLRY", "SNDL", "CLOV", "WISH",
+            "CLNE", "WKHS", "SPCE", "CRSR", "DKNG", "RKT", "MVIS", "RIDE", 
+            "SKLZ", "COIN", "SPY", "QQQ", "DIA", "IWM", "XLK", "XLF", "XLE",
+            "ARKK", "ARKG", "ARKW", "ARKF", "ARKQ", "ARKX", "JPM", "BAC", 
+            "WFC", "C", "GS", "MS", "V", "MA", "PYPL", "SQ", "DIS", "NFLX",
+            "ROKU", "ZM", "TDOC", "SHOP", "JNJ", "PFE", "MRNA", "BNTX", "INTC",
+            "AMD", "MU", "TSM", "QCOM", "BABA", "NIO", "XPEV", "LI", "F", "GM",
+            "X", "CLF", "AA", "FCX", "VALE", "MT", "GLD", "SLV", "USO", "WEED",
+            "CGC", "ACB", "APHA", "TLRY", "MJ", "RIOT", "MARA", "SI", "MSTR",
+            "PLBY", "UWMC", "PRPL", "PLUG", "FCEL", "BLNK", "QS", "CLOV", "HD",
+            "WMT", "TGT", "COST", "KO", "PEP", "MCD", "SBUX", "DASH", "ABNB"
+        }
+        logger.info(f"Using fallback list of {len(fallback_tickers)} common tickers")
+        return fallback_tickers
 
 if __name__ == '__main__':
     textProcessor = TextProcessor()
