@@ -243,6 +243,55 @@ class TextProcessor:
                 contexts.append(context)
                 
         return contexts
+    
+    
+    def analyze_sentiment(self, text):
+        """
+        Analyze sentiment of text
+        
+        Args:
+            text (str): Text to analyze
+            
+        Returns:
+            dict: Sentiment scores
+        """
+        if not text or not isinstance(text, str):
+            return {'compound': 0, 'pos': 0, 'neu': 0, 'neg': 0}
+            
+        # WSB-specific sentiment adjustments
+        wsb_text = text
+    
+        wsb_terms = {
+            'moon': 2.0,
+            'rocket': 2.0,
+            'tendies': 1.5,
+            'diamond hands': 1.5,
+            'paper hands': -1.0,
+            'yolo': 1.0,
+            'short squeeze': 1.5,
+            'gamma squeeze': 1.5,
+            'bear': -0.5,
+            'bull': 0.5,
+            'calls': 0.5,
+            'puts': -0.5,
+            'ape': 1.0,
+            'hodl': 1.0,
+            'bagholder': -1.0,
+        }
+        
+        # Calculate basic sentiment
+        sentiment = self.sia.polarity_scores(wsb_text)
+        
+        # Adjust for specific terms
+        compound_adjustment = 0
+        for term, score in wsb_terms.items():
+            if term in wsb_text.lower():
+                compound_adjustment += score * 0.1
+        
+        # Adjustment to compound score
+        sentiment['compound'] = max(-1.0, min(1.0, sentiment['compound'] + compound_adjustment))
+        
+        return sentiment
 
 if __name__ == '__main__':
     textProcessor = TextProcessor()
