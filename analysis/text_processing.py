@@ -9,6 +9,8 @@ import json
 import os
 import time
 import sys
+import re
+from tqdm import tqdm
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config.config import TWELVEDATA_API_KEY
@@ -172,6 +174,41 @@ class TextProcessor:
             return False
         except:
             return False
+    
+    
+    def extract_tickers(self, text):
+        """
+        Extract stock ticker symbols from text
+        
+        Args:
+            text (str): Text to analyze
+            
+        Returns:
+            list: List of extracted ticker symbols
+        """
+        if not text or not isinstance(text, str):
+            return []
+            
+        # Ticker patterns
+        # $TICKER
+        pattern1 = r'\$([A-Z]{1,5})\b'
+        pattern2 = r'\b([A-Z]{1,5})\b'
+        
+        p1_tickers = re.findall(pattern1, text)
+        p2_tickers = re.findall(pattern2, text)
+        
+        # Combine and filter
+        potential_tickers = set(p1_tickers + p2_tickers)
+        
+        # preference: $ prefixed
+        valid_tickers = []
+        for ticker in potential_tickers:
+            if ticker in p1_tickers or self._is_valid_ticker(ticker):
+                # For non-$ prefixed tickers: avoid common abbreviations
+                if ticker not in ['A', 'I', 'AM', 'PM', 'CEO', 'CFO', 'IPO', 'ATH', 'DD', 'FD', 'YOLO']:
+                    valid_tickers.append(ticker)
+        
+        return valid_tickers
 
 if __name__ == '__main__':
     textProcessor = TextProcessor()
