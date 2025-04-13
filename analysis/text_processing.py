@@ -12,6 +12,8 @@ import sys
 import re
 from tqdm import tqdm
 
+from collections import Counter
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config.config import (
     MIN_TICKER_MENTIONS, 
@@ -292,6 +294,74 @@ class TextProcessor:
         sentiment['compound'] = max(-1.0, min(1.0, sentiment['compound'] + compound_adjustment))
         
         return sentiment
+    
+    
+    def process_posts_and_comments(self, posts_df, comments_df):
+        """
+        Process posts and comments to extract tickers and sentiment
+        
+        Args:
+            posts_df (pandas.DataFrame): DataFrame of Reddit posts
+            comments_df (pandas.DataFrame): DataFrame of Reddit comments
+            
+        Returns:
+            tuple: (ticker_mentions, ticker_sentiment, ticker_contexts)
+        """
+
+        posts_text = []
+        if 'title' in posts_df.columns and 'text' in posts_df.columns:
+            posts_text = posts_df['title'] + ' ' + posts_df['text'].fillna('')
+        
+        comments_text = []
+        if 'text' in comments_df.columns:
+            comments_text = comments_df['text'].fillna('')
+        
+        all_texts = list(posts_text) + list(comments_text)
+        
+        # Extract tickers
+        ticker_mentions = Counter()
+        ticker_sentiment = {}
+        ticker_contexts = {}
+        
+        logger.info("Processing text to extract tickers and sentiment")
+        
+        for text in tqdm(all_texts, desc="Processing text"):
+            tickers = self.extract_tickers(text)
+            
+            for ticker in tickers:
+                ticker_mentions[ticker] += 1
+                
+                # Get context around ticker
+                contexts = self.get_ticker_context(text, ticker)
+                
+                if ticker not in ticker_contexts:
+                    ticker_contexts[ticker] = []
+                ticker_contexts[ticker].extend(contexts)
+                
+                # Analyze sentiment in the context
+                for context in contexts:
+                    sentiment = self.analyze_sentiment(context)
+                    
+                    if ticker not in ticker_sentiment:
+                        ticker_sentiment[ticker] = []
+                    ticker_sentiment[ticker].append(sentiment['compound'])
+        
+        filtered_tickers = {ticker: count for ticker, count in ticker_mentions.items() 
+                           if count >= MIN_TICKER_MENTIONS}
+        
+        # Calculate average sentiment for each ticker
+        avg_sentiment = {}
+        for ticker, sentiments in ticker_sentiment.items():
+            if ticker in filtered_tickers:
+                avg_sentiment[ticker] = sum(sentiments) / len(sentiments)
+        
+        # Keep only contexts for filtered tickers
+        filtered_contexts = {ticker: contexts for ticker, contexts in ticker_contexts.items() 
+                            if ticker in filtered_tickers}
+        
+        logger.info(f"Found {len(filtered_tickers)} tickers with {MIN_TICKER_MENTIONS}+ mentions")
+        
+        return filtered_tickers, avg_sentiment, filtered_contexts
 
 if __name__ == '__main__':
     textProcessor = TextProcessor()
