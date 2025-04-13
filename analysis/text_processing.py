@@ -13,7 +13,11 @@ import re
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from config.config import TWELVEDATA_API_KEY
+from config.config import (
+    MIN_TICKER_MENTIONS, 
+    TICKER_CONTEXT_WINDOW,
+    TWELVEDATA_API_KEY
+)
 
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -209,6 +213,36 @@ class TextProcessor:
                     valid_tickers.append(ticker)
         
         return valid_tickers
+    
+    
+    def get_ticker_context(self, text, ticker, window_size=TICKER_CONTEXT_WINDOW):
+        """
+        Extract context window around ticker mentions
+        
+        Args:
+            text (str): Source text
+            ticker (str): Ticker symbol
+            window_size (int): Character window size (each side)
+            
+        Returns:
+            list: List of context strings around ticker mentions
+        """
+        if not text or not isinstance(text, str):
+            return []
+            
+        contexts = []
+        
+        # Formats: $TICKER and TICKER
+        patterns = [f'\\${ticker}\\b', f'\\b{ticker}\\b']
+        
+        for pattern in patterns:
+            for match in re.finditer(pattern, text):
+                start = max(0, match.start() - window_size)
+                end = min(len(text), match.end() + window_size)
+                context = text[start:end]
+                contexts.append(context)
+                
+        return contexts
 
 if __name__ == '__main__':
     textProcessor = TextProcessor()
