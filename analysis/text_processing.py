@@ -363,6 +363,16 @@ class TextProcessor:
         
         return filtered_tickers, avg_sentiment, filtered_contexts
 
-if __name__ == '__main__':
-    textProcessor = TextProcessor()
-    print(textProcessor.valid_tickers)
+if __name__ == "__main__":
+    
+    # Testing the text processor with sample data
+    test_text = """
+    I'm bullish on $GME and think it's going to moooooon 🚀🚀🚀
+    Also looking at AAPL and TSLA, but those aren't as interesting.
+    """
+    
+    processor = TextProcessor()
+    
+    # Testing ticker extraction
+    tickers = processor.extract_tickers(test_text)
+    print(f"Extracted tickers: {tickers}")
