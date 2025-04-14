@@ -158,28 +158,46 @@ class TextProcessor:
     def _is_valid_ticker(self, ticker):
         """
         Check if a ticker is valid and exists
-        
+
         Args:
             ticker (str): Ticker symbol to check
-            
+
         Returns:
             bool: True if valid, False if invalid
         """
 
         if ticker in self.valid_tickers:
             return True
-            
-        # Validate with Yahoo Finance if not in the valid tickers list
+
+        # Filter out common words/abbreviations
+        common_words = {'A', 'I', 'AN', 'AS', 'AT', 'BE', 'BY', 'GO', 'IF', 'IN', 'IS', 'IT', 'ME', 'NO', 'OF', 'ON', 'OR', 'SO', 'TO', 'UP', 'US', 'WE',
+                       'ALL', 'AND', 'ARE', 'BUT', 'CAN', 'DID', 'FOR', 'GET', 'HAD', 'HAS', 'HER', 'HIM', 'HIS', 'HOW', 'ITS', 'LET', 'MAY', 'NEW', 'NOT', 
+                       'NOW', 'OFF', 'OLD', 'ONE', 'OUR', 'OUT', 'PUT', 'SAY', 'SEE', 'SHE', 'THE', 'TOO', 'USE', 'WAY', 'WHO', 'WHY', 'YES', 'YOU',
+                       'CEO', 'CFO', 'CTO', 'COO', 'IPO', 'ATH', 'ETF', 'ATM', 'DD', 'FD', 'EPS', 'YOLO', 'HODL', 'FOMO', 'IMO', 'TBH'}
+
+        if ticker in common_words:
+            return False
+
+        # Validate
         try:
+            # Disable yfinance logging
+            logging_level = logging.getLogger('yfinance').level
+            logging.getLogger('yfinance').setLevel(logging.CRITICAL)
+
             ticker_info = yf.Ticker(ticker).info
+
+            # Restore original logging
+            logging.getLogger('yfinance').setLevel(logging_level)
+
             if 'symbol' in ticker_info:
-                # Add to our valid tickers set for future reference
                 self.valid_tickers.add(ticker)
                 return True
             return False
         except:
+            # Restore original logging
+            logging.getLogger('yfinance').setLevel(logging_level)
             return False
-    
+
     
     def extract_tickers(self, text):
         """
