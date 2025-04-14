@@ -376,3 +376,14 @@ if __name__ == "__main__":
     # Testing ticker extraction
     tickers = processor.extract_tickers(test_text)
     print(f"Extracted tickers: {tickers}")
+    
+    # Testing sentiment analysis
+    for ticker in tickers:
+        contexts = processor.get_ticker_context(test_text, ticker)
+        sentiments = [processor.analyze_sentiment(ctx) for ctx in contexts]
+        print(f"{ticker} contexts: {contexts}")
+        print(f"{ticker} sentiment scores: {[s['compound'] for s in sentiments]}")
+        
+    # Print the number of valid tickers loaded
+    print(f"Total valid tickers loaded: {len(processor.valid_tickers)}")
+    print(f"Sample tickers: {list(processor.valid_tickers)[:10]}")
