@@ -4,7 +4,7 @@ import time
 import os
 from data.collection.reddit_scraper import RedditScraper
 from analysis.text_processing import TextProcessor
-
+import pandas as pd
 
 # Set up logging
 logging.basicConfig(
@@ -42,10 +42,24 @@ def run_pipeline(output_dir='./output', dashboard=False):
     posts_df.to_csv(os.path.join(output_dir, 'raw_posts.csv'), index=False)
     comments_df.to_csv(os.path.join(output_dir, 'raw_comments.csv'), index=False)
     
+    
+    
+    ########## TEXT PROCESSOR   ##########
     logger.info("Step 2: Processing text to extract tickers and sentiment")
     text_processor = TextProcessor()
     ticker_mentions, ticker_sentiment, ticker_contexts = text_processor.process_posts_and_comments(posts_df, comments_df)
     
+    mentions_df = pd.DataFrame(list(ticker_mentions.items()), columns=['symbol', 'mentions'])
+    sentiment_df = pd.DataFrame([(ticker, avg) for ticker, avg in ticker_sentiment.items()], columns=['symbol', 'sentiment'])
+    ticker_data = pd.merge(mentions_df, sentiment_df, on='symbol', how='outer')
+    ticker_data.to_csv(os.path.join(output_dir, 'ticker_data.csv'), index=False)
+    
+    contexts_data = []
+    for ticker, contexts_list in ticker_contexts.items():
+        for context in contexts_list:
+            contexts_data.append({'symbol': ticker, 'context': context})
+    
+    pd.DataFrame(contexts_data).to_csv(os.path.join(output_dir, 'ticker_contexts.csv'), index=False)
 
 
 

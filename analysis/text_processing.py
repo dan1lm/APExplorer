@@ -1,7 +1,6 @@
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import logging
-import pandas as pd
 import yfinance as yf
 
 import requests

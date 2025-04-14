@@ -3,3 +3,4 @@ praw
 tqdm
 pandas
 nltk
+yfinance
