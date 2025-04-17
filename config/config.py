@@ -26,3 +26,6 @@ TICKER_CONTEXT_WINDOW = 100  # Characters around ticker mention for context
 CACHE_EXPIRY_DAYS = 1
 
 NASDAQ_DATA_LINK_API_KEY = os.getenv('NASDAQ_DATA_LINK_API_KEY')
+
+
+MIN_FLOAT_PERCENTAGE = 15.0
