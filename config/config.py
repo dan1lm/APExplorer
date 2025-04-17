@@ -23,3 +23,6 @@ TWELVEDATA_API_KEY = os.getenv('TWELVEDATA_API_KEY')
 #   Text analysis settings
 MIN_TICKER_MENTIONS = 5  # Minimum mentions to consider a ticker
 TICKER_CONTEXT_WINDOW = 100  # Characters around ticker mention for context
+CACHE_EXPIRY_DAYS = 1
+
+NASDAQ_DATA_LINK_API_KEY = os.getenv('NASDAQ_DATA_LINK_API_KEY')

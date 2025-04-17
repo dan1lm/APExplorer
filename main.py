@@ -5,6 +5,8 @@ import os
 from data.collection.reddit_scraper import RedditScraper
 from analysis.text_processing import TextProcessor
 import pandas as pd
+from data.collection.finance_api import FinanceDataCollector
+from analysis.financial_metrics import FinancialMetricsAnalyzer
 
 # Set up logging
 logging.basicConfig(
@@ -62,7 +64,25 @@ def run_pipeline(output_dir='./output', dashboard=False):
     pd.DataFrame(contexts_data).to_csv(os.path.join(output_dir, 'ticker_contexts.csv'), index=False)
 
 
-
+    # Collecting financial data for the tickers
+    logger.info(f"Step 3: Collecting financial data for {len(ticker_mentions)} tickers")
+    finance_collector = FinanceDataCollector()
+    stock_df, short_interest_df, options_df = finance_collector.collect_all_data(list(ticker_mentions.keys()))
+    
+    # Save financial data
+    stock_df.to_csv(os.path.join(output_dir, 'stock_data.csv'), index=False)
+    short_interest_df.to_csv(os.path.join(output_dir, 'short_interest_data.csv'), index=False)
+    options_df.to_csv(os.path.join(output_dir, 'options_data.csv'), index=False)
+    
+    
+    # Financial metrics calculations
+    logger.info("Step 4: Calculating financial metrics")
+    metrics_analyzer = FinancialMetricsAnalyzer()
+    
+    
+    
+    
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Short Squeeze Detector aka. APExplorer")
     parser.add_argument('--output', type=str, default='./output',

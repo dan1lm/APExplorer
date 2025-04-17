@@ -4,3 +4,4 @@ tqdm
 pandas
 nltk
 yfinance
+nasdaq_data_link

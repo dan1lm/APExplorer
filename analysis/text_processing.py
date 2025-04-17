@@ -1,24 +1,25 @@
+import re
+import pandas as pd
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import logging
-import yfinance as yf
-
-import requests
-import json
 import os
-import time
 import sys
-import re
+import time
+import json
+import requests
+from collections import Counter
 from tqdm import tqdm
 
-from collections import Counter
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from config.config import (
     MIN_TICKER_MENTIONS, 
     TICKER_CONTEXT_WINDOW,
     TWELVEDATA_API_KEY
 )
+
+from data.collection.finance_api import FinanceDataCollector
 
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -30,17 +31,18 @@ try:
     nltk.download('punkt', quiet=True)
 except Exception as e:
     logger.error(f"Error downloading NLTK data: {e}")
-    
+
 
 
 class TextProcessor:
     def __init__(self):
         self.sia = SentimentIntensityAnalyzer()
+        self.finance_collector = FinanceDataCollector()
         self.valid_tickers = self._load_ticker_list()
-    
+        
     def fetch_all_pages(self, base_url, max_pages=10):
         """
-        Helper function to handle pagination in and rate limit
+        Twelvedata API pagination and rate limit
         
         Args:
             base_url (str): Base URL for the API request
@@ -70,7 +72,6 @@ class TextProcessor:
                 if page >= data.get('total_pages', 1):
                     break
                     
-                # Rate limits
                 time.sleep(0.25)  
                 
             except Exception as e:
@@ -87,10 +88,8 @@ class TextProcessor:
             set: Set of valid ticker symbols
         """
         try:
-            # Try to load from cache first to avoid API calls
             cache_file = 'tickers_cache.json'
             if os.path.exists(cache_file):
-                # Check if cache is recent
                 file_time = os.path.getmtime(cache_file)
                 if (time.time() - file_time) < 604800:  # 7 days in seconds
                     with open(cache_file, 'r') as f:
@@ -132,12 +131,12 @@ class TextProcessor:
     
     def _get_fallback_tickers(self):
         """
-        Fallback list of common tickers if something goes wrong with API
+        Common tickers in case API fails
         
         Returns:
-            set: Set of tickers
+            set: Common tickers
         """
-
+        # Common tickers
         fallback_tickers = {
             "AAPL", "MSFT", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "NVDA", 
             "GME", "AMC", "BB", "NOK", "PLTR", "TLRY", "SNDL", "CLOV", "WISH",
@@ -157,47 +156,40 @@ class TextProcessor:
     
     def _is_valid_ticker(self, ticker):
         """
-        Check if a ticker is valid and exists
-
+        Check if a ticker is valid
+        
         Args:
             ticker (str): Ticker symbol to check
-
+            
         Returns:
-            bool: True if valid, False if invalid
+            bool: True if valid, False otherwise
         """
-
+        # First check against preloaded list
         if ticker in self.valid_tickers:
             return True
-
-        # Filter out common words/abbreviations
+            
+        # Filter out common words    
         common_words = {'A', 'I', 'AN', 'AS', 'AT', 'BE', 'BY', 'GO', 'IF', 'IN', 'IS', 'IT', 'ME', 'NO', 'OF', 'ON', 'OR', 'SO', 'TO', 'UP', 'US', 'WE',
                        'ALL', 'AND', 'ARE', 'BUT', 'CAN', 'DID', 'FOR', 'GET', 'HAD', 'HAS', 'HER', 'HIM', 'HIS', 'HOW', 'ITS', 'LET', 'MAY', 'NEW', 'NOT', 
                        'NOW', 'OFF', 'OLD', 'ONE', 'OUR', 'OUT', 'PUT', 'SAY', 'SEE', 'SHE', 'THE', 'TOO', 'USE', 'WAY', 'WHO', 'WHY', 'YES', 'YOU',
                        'CEO', 'CFO', 'CTO', 'COO', 'IPO', 'ATH', 'ETF', 'ATM', 'DD', 'FD', 'EPS', 'YOLO', 'HODL', 'FOMO', 'IMO', 'TBH'}
-
+    
         if ticker in common_words:
             return False
-
-        # Validate
+            
+        # Attempt to validate with Twelvedata
         try:
-            # Disable yfinance logging
-            logging_level = logging.getLogger('yfinance').level
-            logging.getLogger('yfinance').setLevel(logging.CRITICAL)
-
-            ticker_info = yf.Ticker(ticker).info
-
-            # Restore original logging
-            logging.getLogger('yfinance').setLevel(logging_level)
-
-            if 'symbol' in ticker_info:
+            is_valid = self.finance_collector.is_valid_ticker(ticker)
+            
+            if is_valid:
                 self.valid_tickers.add(ticker)
                 return True
+                
             return False
-        except:
-            # Restore original logging
-            logging.getLogger('yfinance').setLevel(logging_level)
+            
+        except Exception as e:
+            logger.error(f"Error validating ticker {ticker}: {e}")
             return False
-
     
     def extract_tickers(self, text):
         """
@@ -233,7 +225,6 @@ class TextProcessor:
         
         return valid_tickers
     
-    
     def get_ticker_context(self, text, ticker, window_size=TICKER_CONTEXT_WINDOW):
         """
         Extract context window around ticker mentions
@@ -262,7 +253,6 @@ class TextProcessor:
                 contexts.append(context)
                 
         return contexts
-    
     
     def analyze_sentiment(self, text):
         """
@@ -311,7 +301,6 @@ class TextProcessor:
         sentiment['compound'] = max(-1.0, min(1.0, sentiment['compound'] + compound_adjustment))
         
         return sentiment
-    
     
     def process_posts_and_comments(self, posts_df, comments_df):
         """
@@ -384,7 +373,7 @@ if __name__ == "__main__":
     
     # Testing the text processor with sample data
     test_text = """
-    I'm bullish on $GME and think it's going to moooooon 🚀🚀🚀
+    I'm bullish on $GME and think it's going to moon 🚀🚀🚀
     Also looking at AAPL and TSLA, but those aren't as interesting.
     """
     
