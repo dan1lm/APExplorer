@@ -13,12 +13,8 @@ import nasdaqdatalink
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 
-try:
-    import yfinance as yf
-    HAS_YFINANCE = True
-except ImportError:
-    HAS_YFINANCE = False
-    logging.warning("yfinance not installed. Options data will be estimated.")
+import yfinance as yf
+
 
 from config.config import (
     TWELVEDATA_API_KEY,
@@ -130,37 +126,38 @@ class FinanceDataCollector:
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
-            
-            if HAS_YFINANCE:
-                try:
-                    ticker = yf.Ticker(ticker_symbol)
-                    hist_data = ticker.history(start=start_date.strftime('%Y-%m-%d'), 
-                                               end=end_date.strftime('%Y-%m-%d'))
+
+            try:
+                ticker = yf.Ticker(ticker_symbol)
+                hist_data = ticker.history(start=start_date.strftime('%Y-%m-%d'), 
+                                           end=end_date.strftime('%Y-%m-%d'))
+                
+                if not hist_data.empty:
+                    # Reset index to have date as column
+                    hist_data = hist_data.reset_index()
+                    # Add ticker column
+                    hist_data['symbol'] = ticker_symbol
                     
-                    if not hist_data.empty:
-                        # Reset index to have date as column
-                        hist_data = hist_data.reset_index()
-                        # Add ticker column
-                        hist_data['symbol'] = ticker_symbol
-                        
-                        hist_data = hist_data.rename(columns={
-                            'Date': 'Date',
-                            'Open': 'Open',
-                            'High': 'High',
-                            'Low': 'Low',
-                            'Close': 'Close',
-                            'Volume': 'Volume'
-                        })
-                        
-                        # Cache the data
-                        self._write_to_cache(ticker_symbol, "stock_data", hist_data.to_dict('records'))
-                        
-                        logger.info(f"Successfully fetched historical data for {ticker_symbol} using yfinance")
-                        return hist_data
-                except Exception as e:
-                    logger.warning(f"yfinance failed, trying Twelvedata as fallback: {e}")
+                    hist_data = hist_data.rename(columns={
+                        'Date': 'Date',
+                        'Open': 'Open',
+                        'High': 'High',
+                        'Low': 'Low',
+                        'Close': 'Close',
+                        'Volume': 'Volume'
+                    })
+                    
+                    # Cache the data
+                    self._write_to_cache(ticker_symbol, "stock_data", hist_data.to_dict('records'))
+                    
+                    logger.info(f"Successfully fetched historical data for {ticker_symbol} using yfinance")
+                    return hist_data
+            except Exception as e:
+                logger.warning(f"yfinance failed, trying Twelvedata as fallback: {e}")
             
             # Twelvedata fallback
+            
+            
             url = f"https://api.twelvedata.com/time_series"
             params = {
                 "symbol": ticker_symbol,
@@ -225,33 +222,33 @@ class FinanceDataCollector:
             return cached_data
         
         # Try to get data from yfinance first if available
-        if HAS_YFINANCE:
-            try:
-                ticker = yf.Ticker(ticker_symbol)
-                key_stats = ticker.info
+
+        try:
+            ticker = yf.Ticker(ticker_symbol)
+            key_stats = ticker.info
+            
+            # Extract relevant short interest metrics
+            short_percent = key_stats.get('shortPercentOfFloat')
+            
+            if short_percent is not None:
+                short_data = {
+                    'symbol': ticker_symbol,
+                    'short_interest': key_stats.get('sharesShort'),
+                    'short_percent_of_float': short_percent * 100 if short_percent < 1 else short_percent,  # Convert decimal to percentage if needed
+                    'days_to_cover': key_stats.get('shortRatio'),
+                    'total_shares': key_stats.get('sharesOutstanding'),
+                    'float_shares': key_stats.get('floatShares'),
+                    'data_source': 'yfinance',
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
                 
-                # Extract relevant short interest metrics
-                short_percent = key_stats.get('shortPercentOfFloat')
+                # Cache the data
+                self._write_to_cache(ticker_symbol, "short_interest", short_data)
                 
-                if short_percent is not None:
-                    short_data = {
-                        'symbol': ticker_symbol,
-                        'short_interest': key_stats.get('sharesShort'),
-                        'short_percent_of_float': short_percent * 100 if short_percent < 1 else short_percent,  # Convert decimal to percentage if needed
-                        'days_to_cover': key_stats.get('shortRatio'),
-                        'total_shares': key_stats.get('sharesOutstanding'),
-                        'float_shares': key_stats.get('floatShares'),
-                        'data_source': 'yfinance',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }
-                    
-                    # Cache the data
-                    self._write_to_cache(ticker_symbol, "short_interest", short_data)
-                    
-                    logger.info(f"Successfully fetched Yahoo Finance short interest data for {ticker_symbol}")
-                    return short_data
-            except Exception as e:
-                logger.warning(f"Error fetching Yahoo Finance short interest: {e}")
+                logger.info(f"Successfully fetched Yahoo Finance short interest data for {ticker_symbol}")
+                return short_data
+        except Exception as e:
+            logger.warning(f"Error fetching Yahoo Finance short interest: {e}")
                 
         # NASDAQ Data Link    
         if self.has_nasdaq and self.nasdaq_api_key:
@@ -385,53 +382,52 @@ class FinanceDataCollector:
         if cached_data:
             return cached_data
             
-        if HAS_YFINANCE:
-            try:
-                ticker = yf.Ticker(ticker_symbol)
+        try:
+            ticker = yf.Ticker(ticker_symbol)
+        
+            expirations = ticker.options
             
-                expirations = ticker.options
+            if not expirations:
+                logger.warning(f"No options data available for {ticker_symbol}")
+                return self._create_estimated_options_data(ticker_symbol)
                 
-                if not expirations:
-                    logger.warning(f"No options data available for {ticker_symbol}")
-                    return self._create_estimated_options_data(ticker_symbol)
-                    
-                nearest_exp = expirations[0]
-                
-                # Get calls and puts for the nearest expiration
-                options = ticker.option_chain(nearest_exp)
-                calls = options.calls
-                puts = options.puts
-                
-                # Calculate put/call ratio
-                call_volume = calls['volume'].sum()
-                put_volume = puts['volume'].sum()
-                pc_ratio = put_volume / call_volume if call_volume > 0 else 0
-                
-                # Calculate total call open interest
-                call_oi = calls['openInterest'].sum()
-                put_oi = puts['openInterest'].sum()
-                
-                options_data = {
-                    'symbol': ticker_symbol,
-                    'expiration_date': nearest_exp,
-                    'call_volume': int(call_volume),
-                    'put_volume': int(put_volume),
-                    'put_call_ratio': float(pc_ratio),
-                    'call_open_interest': int(call_oi),
-                    'put_open_interest': int(put_oi),
-                    'data_source': 'yfinance',
-                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                
-                # Cache the data
-                self._write_to_cache(ticker_symbol, "options", options_data)
-                
-                logger.info(f"Successfully fetched Yahoo Finance options data for {ticker_symbol}")
-                return options_data
-                
-            except Exception as e:
-                logger.warning(f"Error fetching options data from Yahoo Finance: {e}")
-                # Fall back to estimates
+            nearest_exp = expirations[0]
+            
+            # Get calls and puts for the nearest expiration
+            options = ticker.option_chain(nearest_exp)
+            calls = options.calls
+            puts = options.puts
+            
+            # Calculate put/call ratio
+            call_volume = calls['volume'].sum()
+            put_volume = puts['volume'].sum()
+            pc_ratio = put_volume / call_volume if call_volume > 0 else 0
+            
+            # Calculate total call open interest
+            call_oi = calls['openInterest'].sum()
+            put_oi = puts['openInterest'].sum()
+            
+            options_data = {
+                'symbol': ticker_symbol,
+                'expiration_date': nearest_exp,
+                'call_volume': int(call_volume),
+                'put_volume': int(put_volume),
+                'put_call_ratio': float(pc_ratio),
+                'call_open_interest': int(call_oi),
+                'put_open_interest': int(put_oi),
+                'data_source': 'yfinance',
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            # Cache the data
+            self._write_to_cache(ticker_symbol, "options", options_data)
+            
+            logger.info(f"Successfully fetched Yahoo Finance options data for {ticker_symbol}")
+            return options_data
+            
+        except Exception as e:
+            logger.warning(f"Error fetching options data from Yahoo Finance: {e}")
+            # Fall back to estimates
         
         # Fall back to estimates
         return self._create_estimated_options_data(ticker_symbol)
@@ -452,7 +448,7 @@ class FinanceDataCollector:
                 if "statistics" in data:
                     avg_volume = int(data.get("statistics", {}).get("average_volume", 0))
             
-            if avg_volume == 0 and HAS_YFINANCE:
+            if avg_volume == 0:
                 try:
                     ticker = yf.Ticker(ticker_symbol)
                     avg_volume = ticker.info.get('averageVolume', 0)
@@ -512,13 +508,12 @@ class FinanceDataCollector:
             bool: True if valid, False otherwise
         """
         # Try using yfinance first if available (most reliable)
-        if HAS_YFINANCE:
-            try:
-                ticker = yf.Ticker(ticker_symbol)
-                info = ticker.info
-                return 'symbol' in info or 'shortName' in info
-            except:
-                pass  # Fall back to Twelvedata
+        try:
+            ticker = yf.Ticker(ticker_symbol)
+            info = ticker.info
+            return 'symbol' in info or 'shortName' in info
+        except:
+            pass  # Fall back to Twelvedata
         
         # Fall back to Twelvedata
         try:
