@@ -34,14 +34,6 @@ class RedditScraper:
     def get_posts(self, subreddit_name, time_filter='week', limit=POST_LIMIT):
         """
         Fetch posts from a specific subreddit
-        
-        Args:
-            subreddit_name (str): Name of the subreddit
-            time_filter (str): Time filter for posts ('day', 'week', 'month', 'year', 'all')
-            limit (int): Maximum number of posts to fetch
-            
-        Returns:
-            pandas.DataFrame: DataFrame containing post data
         """
         try:
             subreddit = self.reddit.subreddit(subreddit_name)
@@ -84,17 +76,10 @@ class RedditScraper:
     def get_comments(self, post_id, limit=COMMENT_LIMIT):
         """
         Fetch comments for a specific post
-        
-        Args:
-            post_id (str): Reddit post ID
-            limit (int): Maximum number of comments to fetch
-            
-        Returns:
-            pandas.DataFrame: DataFrame containing comment data
         """
         try:
             submission = self.reddit.submission(id=post_id)
-            submission.comments.replace_more(limit=0)  # Top-level comments
+            submission.comments.replace_more(limit=0)
             
             comments_data = []
             comment_count = 0
@@ -128,9 +113,6 @@ class RedditScraper:
     def collect_wsb_data(self):
         """
         Collect posts and comments from all configured subreddits
-        
-        Returns:
-            tuple: (posts_df, comments_df) DataFrames containing all collected data
         """
         all_posts = []
         all_comments = []

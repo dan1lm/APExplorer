@@ -43,13 +43,6 @@ class TextProcessor:
     def fetch_all_pages(self, base_url, max_pages=10):
         """
         Twelvedata API pagination and rate limit
-        
-        Args:
-            base_url (str): Base URL for the API request
-            max_pages (int): Maximum number of pages to fetch
-            
-        Returns:
-            list: Combined data from all pages
         """
         all_data = []
         
@@ -84,8 +77,6 @@ class TextProcessor:
         """
         Load a list of valid stock tickers from Twelvedata API
         
-        Returns:
-            set: Set of valid ticker symbols
         """
         try:
             cache_file = 'tickers_cache.json'
@@ -113,11 +104,9 @@ class TextProcessor:
             nasdaq_url = f"https://api.twelvedata.com/stocks?exchange=NASDAQ&apikey={TWELVEDATA_API_KEY}"
             nasdaq_stocks = self.fetch_all_pages(nasdaq_url, max_pages=5)
             
-            # Extract symbols and add to set
             for stock in nyse_stocks + nasdaq_stocks:
                 tickers.add(stock['symbol'])
             
-            # Save to cache
             if tickers:
                 with open(cache_file, 'w') as f:
                     json.dump(list(tickers), f)
@@ -132,9 +121,7 @@ class TextProcessor:
     def _get_fallback_tickers(self):
         """
         Common tickers in case API fails
-        
-        Returns:
-            set: Common tickers
+
         """
         # Common tickers
         fallback_tickers = {
@@ -157,14 +144,8 @@ class TextProcessor:
     def _is_valid_ticker(self, ticker):
         """
         Check if a ticker is valid
-        
-        Args:
-            ticker (str): Ticker symbol to check
-            
-        Returns:
-            bool: True if valid, False otherwise
         """
-        # First check against preloaded list
+
         if ticker in self.valid_tickers:
             return True
             
@@ -177,7 +158,6 @@ class TextProcessor:
         if ticker in common_words:
             return False
             
-        # Attempt to validate with Twelvedata
         try:
             is_valid = self.finance_collector.is_valid_ticker(ticker)
             
@@ -194,12 +174,6 @@ class TextProcessor:
     def extract_tickers(self, text):
         """
         Extract stock ticker symbols from text
-        
-        Args:
-            text (str): Text to analyze
-            
-        Returns:
-            list: List of extracted ticker symbols
         """
         if not text or not isinstance(text, str):
             return []
@@ -212,10 +186,8 @@ class TextProcessor:
         p1_tickers = re.findall(pattern1, text)
         p2_tickers = re.findall(pattern2, text)
         
-        # Combine and filter
         potential_tickers = set(p1_tickers + p2_tickers)
         
-        # preference: $ prefixed
         valid_tickers = []
         for ticker in potential_tickers:
             if ticker in p1_tickers or self._is_valid_ticker(ticker):
@@ -228,14 +200,6 @@ class TextProcessor:
     def get_ticker_context(self, text, ticker, window_size=TICKER_CONTEXT_WINDOW):
         """
         Extract context window around ticker mentions
-        
-        Args:
-            text (str): Source text
-            ticker (str): Ticker symbol
-            window_size (int): Character window size (each side)
-            
-        Returns:
-            list: List of context strings around ticker mentions
         """
         if not text or not isinstance(text, str):
             return []
@@ -257,12 +221,6 @@ class TextProcessor:
     def analyze_sentiment(self, text):
         """
         Analyze sentiment of text
-        
-        Args:
-            text (str): Text to analyze
-            
-        Returns:
-            dict: Sentiment scores
         """
         if not text or not isinstance(text, str):
             return {'compound': 0, 'pos': 0, 'neu': 0, 'neg': 0}
@@ -288,16 +246,13 @@ class TextProcessor:
             'bagholder': -1.0,
         }
         
-        # Calculate basic sentiment
         sentiment = self.sia.polarity_scores(wsb_text)
         
-        # Adjust for specific terms
         compound_adjustment = 0
         for term, score in wsb_terms.items():
             if term in wsb_text.lower():
                 compound_adjustment += score * 0.1
         
-        # Adjustment to compound score
         sentiment['compound'] = max(-1.0, min(1.0, sentiment['compound'] + compound_adjustment))
         
         return sentiment
@@ -305,13 +260,6 @@ class TextProcessor:
     def process_posts_and_comments(self, posts_df, comments_df):
         """
         Process posts and comments to extract tickers and sentiment
-        
-        Args:
-            posts_df (pandas.DataFrame): DataFrame of Reddit posts
-            comments_df (pandas.DataFrame): DataFrame of Reddit comments
-            
-        Returns:
-            tuple: (ticker_mentions, ticker_sentiment, ticker_contexts)
         """
 
         posts_text = []
@@ -336,15 +284,13 @@ class TextProcessor:
             
             for ticker in tickers:
                 ticker_mentions[ticker] += 1
-                
-                # Get context around ticker
+
                 contexts = self.get_ticker_context(text, ticker)
                 
                 if ticker not in ticker_contexts:
                     ticker_contexts[ticker] = []
                 ticker_contexts[ticker].extend(contexts)
-                
-                # Analyze sentiment in the context
+
                 for context in contexts:
                     sentiment = self.analyze_sentiment(context)
                     
@@ -354,14 +300,12 @@ class TextProcessor:
         
         filtered_tickers = {ticker: count for ticker, count in ticker_mentions.items() 
                            if count >= MIN_TICKER_MENTIONS}
-        
-        # Calculate average sentiment for each ticker
+
         avg_sentiment = {}
         for ticker, sentiments in ticker_sentiment.items():
             if ticker in filtered_tickers:
                 avg_sentiment[ticker] = sum(sentiments) / len(sentiments)
-        
-        # Keep only contexts for filtered tickers
+
         filtered_contexts = {ticker: contexts for ticker, contexts in ticker_contexts.items() 
                             if ticker in filtered_tickers}
         
@@ -370,8 +314,7 @@ class TextProcessor:
         return filtered_tickers, avg_sentiment, filtered_contexts
 
 if __name__ == "__main__":
-    
-    # Testing the text processor with sample data
+
     test_text = """
     I'm bullish on $GME and think it's going to moon 🚀🚀🚀
     Also looking at AAPL and TSLA, but those aren't as interesting.
@@ -379,7 +322,6 @@ if __name__ == "__main__":
     
     processor = TextProcessor()
     
-    # Testing ticker extraction
     tickers = processor.extract_tickers(test_text)
     print(f"Extracted tickers: {tickers}")
     
@@ -390,6 +332,5 @@ if __name__ == "__main__":
         print(f"{ticker} contexts: {contexts}")
         print(f"{ticker} sentiment scores: {[s['compound'] for s in sentiments]}")
         
-    # Print the number of valid tickers loaded
     print(f"Total valid tickers loaded: {len(processor.valid_tickers)}")
     print(f"Sample tickers: {list(processor.valid_tickers)[:10]}")

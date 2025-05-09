@@ -29,3 +29,18 @@ NASDAQ_DATA_LINK_API_KEY = os.getenv('NASDAQ_DATA_LINK_API_KEY')
 
 
 MIN_FLOAT_PERCENTAGE = 15.0
+
+# Short interest
+HIGH_SHORT_INTEREST = 20.0  # High short interest percentage threshold
+HIGH_DAYS_TO_COVER = 5.0  # High days to cover
+MIN_FLOAT_PERCENTAGE = 15.0  # Minimum percentage of float shorted
+
+# Scoring weights
+WEIGHT_MENTIONS = 0.3
+WEIGHT_SENTIMENT = 0.2
+WEIGHT_SHORT_INTEREST = 0.25
+WEIGHT_DAYS_TO_COVER = 0.15
+WEIGHT_FLOAT_PERCENTAGE = 0.1
+
+# Alert thresholds
+SQUEEZE_SCORE_THRESHOLD = 0.65  # Score threshold for potential squeeze alert

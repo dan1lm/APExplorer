@@ -22,20 +22,20 @@ class FinancialMetricsAnalyzer:
     def calculate_volatility(self, stock_data):
         """
         Calculate stock volatility
-        
-        Args:
-            stock_data (pandas.DataFrame): Historical stock data
-            
-        Returns:
-            dict: Volatility metrics by ticker
         """
         volatility_metrics = {}
         
-        # Group by ticker
+        if stock_data.empty:
+            logger.warning("No stock data available for volatility calculation")
+            return volatility_metrics
+            
+        if 'symbol' not in stock_data.columns:
+            logger.warning("Stock data missing 'symbol' column. Cannot calculate volatility.")
+            return volatility_metrics
+        
         grouped = stock_data.groupby('symbol')
         
         for symbol, group in grouped:
-            # Daily returns
             group = group.sort_values('Date')
             group['daily_return'] = group['Close'].pct_change()
             
@@ -64,27 +64,29 @@ class FinancialMetricsAnalyzer:
     def calculate_short_squeeze_metrics(self, short_interest_data, stock_data, options_data=None):
         """
         Short squeeze metrics calculation
-        
-        Args:
-            short_interest_data (pandas.DataFrame): Short interest data
-            stock_data (pandas.DataFrame): Historical stock data
-            options_data (pandas.DataFrame): Options data
-            
-        Returns:
-            pandas.DataFrame: Short squeeze metrics
         """
+
+        if short_interest_data.empty:
+            logger.warning("No short interest data available. Cannot calculate squeeze metrics.")
+            return pd.DataFrame()
+            
+        if stock_data.empty:
+            logger.warning("No stock data available. Cannot calculate squeeze metrics.")
+            return pd.DataFrame()
 
         squeeze_metrics = []
         
-        # Get the most recent date for stock data
-        stock_latest = stock_data.groupby('symbol')['Date'].max().reset_index()
-        stock_latest_df = pd.merge(
-            stock_data, 
-            stock_latest, 
-            on=['symbol', 'Date']
-        )
+        try:
+            stock_latest = stock_data.groupby('symbol')['Date'].max().reset_index()
+            stock_latest_df = pd.merge(
+                stock_data, 
+                stock_latest, 
+                on=['symbol', 'Date']
+            )
+        except Exception as e:
+            logger.error(f"Error preparing stock data: {e}")
+            return pd.DataFrame()
         
-        # Prepare options data dict and calculate metrics for tickers
         options_dict = {}
         if options_data is not None and not options_data.empty:
             for _, row in options_data.iterrows():
@@ -95,16 +97,13 @@ class FinancialMetricsAnalyzer:
         for _, row in tqdm(short_interest_data.iterrows(), total=len(short_interest_data)):
             symbol = row['symbol']
             
-            # Skip if missing key data
             if pd.isna(row['short_percent_of_float']) or pd.isna(row['short_ratio']):
                 continue
                 
-            # Get latest stock data
             latest_stock = stock_latest_df[stock_latest_df['symbol'] == symbol]
             if latest_stock.empty:
                 continue
                 
-            # Get stock price and volume, and calculate days to cover
             price = latest_stock['Close'].values[0]
             volume = latest_stock['Volume'].values[0]
             
@@ -112,7 +111,6 @@ class FinancialMetricsAnalyzer:
             if pd.isna(days_to_cover) and not pd.isna(row['short_interest']) and volume > 0:
                 days_to_cover = row['short_interest'] / volume
             
-            # Calculate short interest as percentage of float and tital market value of short positions
             si_percent = row['short_percent_of_float']
             short_value = None
             if not pd.isna(row['short_interest']):
@@ -139,7 +137,7 @@ class FinancialMetricsAnalyzer:
                 
             # Score based on call options activity
             if call_volume is not None and put_call_ratio is not None:
-                if put_call_ratio < 0.7:  # More calls than puts (bullish)
+                if put_call_ratio < 0.7:  # More calls than puts so bullish
                     squeeze_potential += (1 - min(put_call_ratio, 1)) * 0.2
             
             # Score based on recent price and volume action
@@ -153,10 +151,9 @@ class FinancialMetricsAnalyzer:
                 
                 # Check for positive price momentum
                 price_change = recent_data['Close'].pct_change().mean()
-                if price_change > 0:  # Price increasing
+                if price_change > 0:  
                     squeeze_potential += min(price_change * 10, 1) * 0.1
             
-            # Add metrics to result
             metrics = {
                 'symbol': symbol,
                 'short_interest_percent': si_percent,
@@ -173,7 +170,6 @@ class FinancialMetricsAnalyzer:
         
         squeeze_df = pd.DataFrame(squeeze_metrics)
         
-        # Sort by squeeze potential
         if not squeeze_df.empty:
             squeeze_df = squeeze_df.sort_values('squeeze_potential', ascending=False)
         
